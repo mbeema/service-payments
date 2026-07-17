@@ -2,9 +2,9 @@
 # SERVICE REPO — THIN CALLER of the CENTRAL PIPELINE (mbeema/platform-pipelines@v1)
 # Repo: mbeema/service-payments  (Function App / zip service)
 #
-# Every job delegates to the central reusable workflows. build/deploy use the
-# POC (dummy) variants; release + bump-ledger are the production reusables.
-# Prod is released from platform-releases via prod.json.
+# CI auto-releases to DEV ONLY. staging and prod are gated promotions run from
+# platform-releases (release.yml) with required-reviewer approval.
+#   build -> deploy-dev -> release (tag) -> bump DEV ledger
 # =============================================================================
 name: ci-cd
 
@@ -31,14 +31,6 @@ jobs:
       app_name: payments-dev
       version: ${{ needs.build.outputs.version }}
 
-  deploy-staging:
-    needs: [build, deploy-dev]
-    uses: mbeema/platform-pipelines/.github/workflows/reusable-deploy-poc.yml@v1
-    with:
-      environment: staging
-      app_name: payments-staging
-      version: ${{ needs.build.outputs.version }}
-
   release:
     needs: build
     uses: mbeema/platform-pipelines/.github/workflows/reusable-release.yml@v1
@@ -46,12 +38,15 @@ jobs:
       service_name: payments
     secrets: inherit
 
-  bump-staging-ledger:
-    needs: [build, deploy-staging, release]
+  bump-dev-ledger:
+    needs: [build, deploy-dev, release]
     uses: mbeema/platform-pipelines/.github/workflows/reusable-bump-ledger-poc.yml@v1
     with:
       service_name: payments
       version: ${{ needs.build.outputs.version }}
       semver: ${{ needs.release.outputs.semver }}
-      environment: staging
+      environment: dev
     secrets: inherit
+
+  # staging & prod are NOT here — release them from platform-releases:
+  #   Actions -> release -> services=payments, environment=staging|prod  (approval required)
